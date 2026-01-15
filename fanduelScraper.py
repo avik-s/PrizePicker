@@ -74,7 +74,7 @@ def scrape_market(driver, prop_name, url_suffix):
         while True:
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             
-            time.sleep(random.uniform(2.0, 3.0))
+            time.sleep(.5)
             
             new_height = driver.execute_script("return document.body.scrollHeight")
             
@@ -84,10 +84,10 @@ def scrape_market(driver, prop_name, url_suffix):
                     print(f"  > stuck at height {last_height}. trying a scroll shake to fix it ({retries}/{max_retries})...")
                     
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight - 1000);")
-                    time.sleep(1)
+                    time.sleep(.5)
 
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight - 500);")
-                    time.sleep(2)
+                    time.sleep(.5)
 
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                     
