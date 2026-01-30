@@ -1,3 +1,15 @@
+"""
+fanduelScraper.py
+
+This script scrapes player prop odds from BettingPros.com, specifically targeting FanDuel and PrizePicks lines.
+It collects data for various markets (e.g., Points, Rebounds, Assists) for NFL and NBA.
+
+Key Features:
+- Uses Selenium for dynamic page content loading (infinite scroll handling).
+- Extracts player names, teams, and Prop lines.
+- Calculates "Fair" odds by removing the vigorish (using Novig method) from FanDuel's two-way lines.
+- Saves cleaned and processed data into CSV files in the 'props/' directory for use by find_bets.py.
+"""
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -5,10 +17,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import pandas as pd
 import time
-import random
 import os
+from datetime import date
 
 def calculate_novig(over_odds, under_odds):
+    """
+    Calculates the "Fair" win probability (Novig prob) for a two-way market.
+    Removes the bookmaker's margin (vig) from American odds.
+
+    Args:
+        over_odds (int): American odds for the Over (e.g., -110, +100).
+        under_odds (int): American odds for the Under.
+
+    Returns:
+        tuple: (fair_over_prob, fair_under_prob) as floats (0.0 - 1.0).
+    """
     def get_implied(american_odds):
         if american_odds > 0:
             return 100 / (american_odds + 100)
@@ -27,27 +50,44 @@ def calculate_novig(over_odds, under_odds):
     except ZeroDivisionError:
         return 0.0, 0.0
 
-def scrape_market(driver, prop_name, url_suffix):
-    base_url = "https://www.bettingpros.com/nba/odds/player-props/"
-    url = f"{base_url}{url_suffix}"
-    print(f"\n--- Starting Scrape: {prop_name} ---")
-    print(f"Connecting to {url}...")
+def scrape_market(driver, sport, prop_name, url_suffix):
+    """
+    Scrapes a specific prop market (e.g., 'nba', 'Points') using Selenium.
+    Handles page scrolling to ensure all players are loaded.
+    """
+    base_url = f"https://www.bettingpros.com/{sport}/odds/player-props/"
+    url = f"{base_url}{url_suffix}?date={date.today()}"
+    print(f"\n--- Starting Scrape: {sport.upper()} {prop_name} ---")
+    print(f"Connecting to {url}")
     
     market_data = []
     
-    try:
-        driver.get(url)
-        
-        wait = WebDriverWait(driver, 30)
+    # Retry logic for initial page load
+    first_attempt = True
+    while True:
         try:
+            if not first_attempt:
+                print(f"Retrying connection to {prop_name}")
+            
+            driver.get(url)
+            
+            wait = WebDriverWait(driver, 30)
+            # Wait for main table container and at least one odds row
             container = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".grouped-items-with-sticky-footer")))
             wait.until(EC.presence_of_element_located((By.CLASS_NAME, "odds-offer")))
-        except:
-            print(f"Timeout loading {prop_name}. Skipping...")
-            return []
+            break
             
-        print("Page initial load complete.")
+        except Exception as e:
+            print(f"Timeout/Error loading {prop_name}. Retrying in 5 seconds")
+            time.sleep(5)
+            first_attempt = False
+            continue
+            
+    print("Page initial load complete.")
 
+    try:
+        # Locate the headers to find which column corresponds to FanDuel and PrizePicks
+        # The column order can change, so we must identify dynamically
         header_items = container.find_elements(By.CSS_SELECTOR, ".odds-offers-header .odds-offers-header__item")
         
         fd_index = -1
@@ -65,8 +105,9 @@ def scrape_market(driver, prop_name, url_suffix):
         if fd_index == -1: print(f"Warning: FanDuel column not found for {prop_name}.")
         if pp_index == -1: print(f"Warning: PrizePicks column not found for {prop_name}.")
 
-        print(f"Scrolling to load all data for {prop_name}...")
+        print(f"Scrolling to load all data for {prop_name}")
         
+        # Infinite scroll handling - BettingPros loads data as you scroll down
         last_height = driver.execute_script("return document.body.scrollHeight")
         retries = 0
         max_retries = 5
@@ -81,8 +122,9 @@ def scrape_market(driver, prop_name, url_suffix):
             if new_height == last_height:
                 retries += 1
                 if retries <= max_retries:
-                    print(f"  > stuck at height {last_height}. trying a scroll shake to fix it ({retries}/{max_retries})...")
+                    print(f"  > Retrying at height {last_height} ({retries}/{max_retries})")
                     
+                    # 'Refresh Maneuver': Scroll up a bit then back down to trigger load
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight - 1000);")
                     time.sleep(.5)
 
@@ -94,7 +136,8 @@ def scrape_market(driver, prop_name, url_suffix):
                     new_height = driver.execute_script("return document.body.scrollHeight")
                     
                     if new_height > last_height:
-                        print("  > Loading more data...")
+                        rows_found = len(driver.find_elements(By.CLASS_NAME, "odds-offer"))
+                        print(f"  > Loading more data (height: {new_height}, players: {rows_found})")
                         last_height = new_height
                         retries = 0
                 else:
@@ -102,14 +145,14 @@ def scrape_market(driver, prop_name, url_suffix):
                     break
             else:
                 rows_found = len(driver.find_elements(By.CLASS_NAME, "odds-offer"))
-                print(f"  > Loading more data... (height: {new_height}, players: {rows_found})")
+                print(f"  > Loading more data (height: {new_height}, players: {rows_found})")
                 last_height = new_height
                 retries = 0
 
         container = driver.find_element(By.CSS_SELECTOR, ".grouped-items-with-sticky-footer")
         player_rows = container.find_elements(By.CLASS_NAME, "odds-offer")
         
-        print(f"Parsing {len(player_rows)} rows...")
+        print(f"Parsing {len(player_rows)} rows")
 
         for row in player_rows:
             try:
@@ -123,10 +166,21 @@ def scrape_market(driver, prop_name, url_suffix):
                     team = team_el.text.strip()
                 except:
                     team = "Unknown"
-                
+
+                try:
+                    img_el = row.find_element(By.TAG_NAME, "img")
+                    img_url = img_el.get_attribute("src")
+                except:
+                    if sport == "nba":
+                        img_url = "https://www.nba.com/assets/logos/teams/primary/web/MIN.svg" 
+                    else:
+                        img_url = "https://static.www.nfl.com/league/apps/fantasy/logos/200x200/NFL.png"
+
                 row_data = {
                     "Player": name,
+                    "Player Image": img_url,
                     "Team": team,
+                    "Sport": sport.upper(),
                     "Prop Type": prop_name,
                     "FanDuel Line": "NL",
                     "FD Over Odds": "NL",
@@ -189,26 +243,43 @@ def scrape_market(driver, prop_name, url_suffix):
     print(f"Collected {len(market_data)} items for {prop_name}.")
     return market_data
 
-def scrape_nba_multibook_props():
+def scrape_multibook_props():
+    """
+    Main execution function.
+    Initializes a Selenium WebDriver, defines markets to scrape,
+    iterates through them, scrapes data, cleans duplicates,
+    and saves the results to CSV files.
+    """
     chrome_options = Options()
-    chrome_options.add_argument("--headless") 
+    # Run in headless mode (no GUI)
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("window-size=1280,800")
+    # Disable automation detection
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
     
     driver = webdriver.Chrome(options=chrome_options)
     
+    # List of markets to scrape: (Sport, PropName, URL_Suffix)
     markets = [
-        ("Points", "points/"),
-        ("Rebounds", "rebounds/"),
-        ("Assists", "assists/"),
-        ("Steals", "steals/"),
-        ("Blocks", "blocks/"),
-        ("Points+Assists", "points-assists/"),
-        ("Points+Rebounds", "points-rebounds/"),
-        ("Rebounds+Assists", "rebounds-assists/"),
-        ("Pts+Reb+Ast", "points-assists-rebounds/")
+        ("nba", "Points", "points/"),
+        ("nba", "Rebounds", "rebounds/"),
+        ("nba", "Assists", "assists/"),
+        ("nba", "Steals", "steals/"),
+        ("nba", "Blocks", "blocks/"),
+        ("nba", "Points+Assists", "points-assists/"),
+        ("nba", "Points+Rebounds", "points-rebounds/"),
+        ("nba", "Rebounds+Assists", "rebounds-assists/"),
+        ("nba", "Pts+Reb+Ast", "points-assists-rebounds/"),
+
+        # ("nfl", "Receiving Yards", "receiving-yards/"),
+        # ("nfl", "Receptions", "receptions/"),
+        # ("nfl", "Rushing Yards", "rushing-yards/"),
+        # ("nfl", "Rushing Attempts", "rushing-attempts/"),
+        # ("nfl", "Passing Yards", "passing-yards/"),
+        # ("nfl", "Passing Attempts", "passing-attempts/"),
+        # ("nfl", "Passing Completions", "passing-completions/"),
     ]
     
     all_data = []
@@ -218,18 +289,26 @@ def scrape_nba_multibook_props():
         os.makedirs(output_folder)
     
     try:
-        for prop_name, suffix in markets:
-            market_data = scrape_market(driver, prop_name, suffix)
+        for sport, prop_name, suffix in markets:
+            market_data = scrape_market(driver, sport, prop_name, suffix)
             
             if market_data:
                 df_prop = pd.DataFrame(market_data)
+
+
+                initial_count = len(df_prop)
+                df_prop.drop_duplicates(subset=["Player", "Team", "Sport", "Prop Type"], keep='first', inplace=True)
+                dropped_count = initial_count - len(df_prop)
+                if dropped_count > 0:
+                    print(f"Removed {dropped_count} duplicates for {prop_name}.")
                 
-                cols = ["Player", "Team", "Prop Type", "FanDuel Line", "FD Over Odds", "FD Under Odds", "PrizePicks Line", "FD Fair Over %", "FD Fair Under %"]
+                cols = ["Player", "Player Image", "Team", "Sport", "Prop Type", "FanDuel Line", "FD Over Odds", "FD Under Odds", "PrizePicks Line", "FD Fair Over %", "FD Fair Under %"]
+
                 cols = [c for c in cols if c in df_prop.columns]
                 df_prop = df_prop[cols]
                 
                 clean_name = prop_name.lower().replace("+", "_").replace(" ", "_")
-                output_file = f"{output_folder}/nba_props_{clean_name}.csv"
+                output_file = f"{output_folder}/{sport}_props_{clean_name}.csv" 
                 df_prop.to_csv(output_file, index=False)
                 print(f"Saved {len(df_prop)} rows to {output_file}")
                 
@@ -238,7 +317,7 @@ def scrape_nba_multibook_props():
             time.sleep(2)
             
         if all_data:
-            print(f"\nCollectd {len(all_data)} total props.")
+            print(f"\nCollected {len(all_data)} total props.")
         else:
             print("No data collected.")
 
@@ -246,4 +325,4 @@ def scrape_nba_multibook_props():
         driver.quit()
 
 if __name__ == "__main__":
-    scrape_nba_multibook_props()
+    scrape_multibook_props()

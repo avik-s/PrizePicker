@@ -1,6 +1,5 @@
 .venv/
 __pycache__/
-*.csv
 props/
 .DS_Store
 props/*

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrizePicker Generator</title>
+    <!-- Fonts: Inter (Labels) & JetBrains Mono (Data) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            /* Deep Space Theme */
+            --bg-app: #0B0E11;
+            --bg-card: #15191C;
+            --bg-hover: #1E2329;
+            --border: #262C33;
+
+            --accent-green: #00FF94;
+            --accent-red: #FF4D4D;
+            --accent-gold: #FFD700;
+
+            --text-primary: #FFFFFF;
+            --text-secondary: #6B7280;
+            --text-muted: #4B5563;
+        }
+
+        body {
+            background-color: var(--bg-app);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 30px;
+            font-size: 13px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        header {
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            margin: 0 0 5px 0;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Parlay Grid */
+        .parlay-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 20px;
+        }
+
+        /* Slip Card */
+        .slip-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        .slip-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border-color: #3f3f46;
+        }
+
+        .slip-header {
+            background: #1e2025;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .slip-index {
+            font-weight: 700;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+        }
+
+        .slip-stats {
+            display: flex;
+            gap: 15px;
+            text-align: right;
+        }
+
+        .stat-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-lbl {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .stat-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .val-good {
+            color: var(--accent-green);
+        }
+
+        /* Leg List */
+        .legs-container {
+            padding: 10px 0;
+        }
+
+        .leg-row {
+            display: grid;
+            grid-template-columns: 35px 1fr auto;
+            align-items: center;
+            padding: 8px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: background 0.1s;
+        }
+
+        .leg-row:last-child {
+            border-bottom: none;
+        }
+
+        .leg-row:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .leg-avatar img {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #27272a;
+        }
+
+        .leg-avatar-ph {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #27272a;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .leg-info {
+            padding-left: 12px;
+        }
+
+        .leg-main {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .leg-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+            margin-top: 2px;
+        }
+
+        .leg-prob {
+            text-align: right;
+        }
+
+        .prob-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .prob-low {
+            color: #facc15;
+        }
+
+        /* Yellow for < 54.34 but valid in avg */
+        .prob-high {
+            color: var(--accent-green);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            grid-column: 1 / -1;
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            grid-column: 1 / -1;
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        .slip-footer {
+            background: #1e2025;
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+        }
+
+        /* New UI Elements */
+        .prob-pill {
+            background: rgba(0, 255, 148, 0.1);
+            color: #00FF94;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono';
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .leg-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            /* Increased gap */
+            padding: 12px 15px;
+            /* More breathing room */
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            /* Soft divider */
+        }
+
+        .leg-row:last-child {
+            border-bottom: none;
+        }
+
+        .leg-info {
+            flex-grow: 1;
+            margin-right: 10px;
+        }
+
+        .leg-meta {
+            font-size: 0.75rem;
+            color: #777;
+            margin-top: 2px;
+            display: flex;
+            align-items: center;
+        }
+
+        .bet-selection {
+            font-weight: 600;
+            margin-left: 8px;
+            font-size: 0.85rem;
+        }
+
+        .bet-over {
+            color: #66b3ff;
+        }
+
+        /* Soft Blue */
+        .bet-under {
+            color: #ff8080;
+        }
+
+        /* Soft Red */
+
+        .high-value-card {
+            border: 1px solid rgba(0, 255, 148, 0.4) !important;
+            box-shadow: 0 0 15px rgba(0, 255, 148, 0.1);
+        }
+
+        /* Wager Box Styling */
+        .wager-box {
+            display: flex;
+            align-items: center;
+            background: #0B0D10;
+            border: 1px solid #2A2E33;
+            border-radius: 6px;
+            padding: 0 12px;
+            height: 40px;
+            transition: all 0.2s ease;
+        }
+
+        .wager-box:hover {
+            border-color: #444;
+        }
+
+        .wager-box:focus-within {
+            border-color: #00FF94;
+            background: #111;
+        }
+
+        .wager-input {
+            background: transparent;
+            border: none;
+            color: #fff;
+            width: 50px;
+            height: 100%;
+            outline: none;
+            font-family: 'JetBrains Mono';
+            font-size: 1rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header style="flex-direction: column; align-items: flex-start; gap: 15px;">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: top;">
+                <div>
+                    <h1>PARLAY GENERATOR</h1>
+                    <div class="subtitle">
+                        {% if current_style == 'props' %}
+                        Top Individual Props
+                        {% else %}
+                        {{ current_size }}-Leg {{ current_style|capitalize }} Play
+                        <span
+                            style="color: var(--accent-green); margin-left:10px; font-size: 0.8em; font-family: 'JetBrains Mono'">
+                            (Target >
+                            {% if current_style == 'power' and current_size == 2 %}57.74%{% endif %}
+                            {% if current_style == 'power' and current_size == 3 %}55.05%{% endif %}
+                            {% if current_style == 'power' and current_size == 4 %}56.23%{% endif %}
+                            {% if current_style == 'power' and current_size == 5 %}54.93%{% endif %}
+                            {% if current_style == 'power' and current_size == 6 %}54.66%{% endif %}
+                            {% if current_style == 'flex' and current_size == 3 %}57.74%{% endif %}
+                            {% if current_style == 'flex' and current_size == 4 %}55.04%{% endif %}
+                            {% if current_style == 'flex' and current_size == 5 %}54.26%{% endif %}
+                            {% if current_style == 'flex' and current_size == 6 %}54.21%{% endif %}
+                            )
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div style="display:flex; gap:15px; align-items:center;">
+
+
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="controls-area" style="flex-direction: column; gap: 15px;">
+
+                <!-- Level 1: Mode Select -->
+                <div class="control-row">
+                    <span class="lbl" style="min-width: 60px;">MODE</span>
+                    <div class="btn-group">
+                        <a href="/?style=power&size=6"
+                            class="btn-toggle {% if current_style != 'props' %}active{% endif %}">PARLAYS</a>
+                        <a href="/?style=props&size=1"
+                            class="btn-toggle {% if current_style == 'props' %}active{% endif %}">PROPS</a>
+                    </div>
+                </div>
+
+                <!-- Level 2: Parlay Options (Hidden if Props) -->
+                {% if current_style != 'props' %}
+                <div style="width: 100%; height: 1px; background: rgba(255,255,255,0.1);"></div>
+                {% else %}
+                <div class="control-row">
+                    <span class="lbl">COMPARE TO</span>
+                    <select id="propThreshold" onchange="updatePropEdges()"
+                        style="background:#222; border:1px solid #333; color:#ccc; padding:6px; border-radius:4px; font-family:'JetBrains Mono';">
+                        <optgroup label="Power Plays">
+                            <option value="57.74">2-Leg Power (57.74%)</option>
+                            <option value="55.05">3-Leg Power (55.05%)</option>
+                            <option value="56.23">4-Leg Power (56.23%)</option>
+                            <option value="54.93">5-Leg Power (54.93%)</option>
+                            <option value="54.66">6-Leg Power (54.66%)</option>
+                        </optgroup>
+                        <optgroup label="Flex Plays">
+                            <option value="57.74">3-Leg Flex (57.74%)</option>
+                            <option value="55.04">4-Leg Flex (55.04%)</option>
+                            <option value="54.26">5-Leg Flex (54.26%)</option>
+                            <option value="54.21" selected>6-Leg Flex (54.21%)</option>
+                        </optgroup>
+                    </select>
+                </div>
+                {% endif %}
+
+                {% if current_style != 'props' %}
+
+                <div class="control-row" style="display: flex; gap: 40px; flex-wrap: wrap;">
+                    <!-- Style -->
+                    <div class="control-group">
+                        <span class="lbl">TYPE</span>
+                        <div class="btn-group">
+                            <a href="/?style=power&size={{ current_size if current_size in [2,3,4,5,6] else 6 }}"
+                                class="btn-toggle {% if current_style == 'power' %}active{% endif %}">POWER</a>
+                            <a href="/?style=flex&size={{ current_size if current_size in [3,4,5,6] else 3 }}"
+                                class="btn-toggle {% if current_style == 'flex' %}active{% endif %}">FLEX</a>
+                        </div>
+                    </div>
+
+                    <!-- Size -->
+                    <div class="control-group">
+                        <span class="lbl">SIZE</span>
+                        <div class="btn-group">
+                            {% if current_style == 'power' %}
+                            <a href="/?style=power&size=2"
+                                class="btn-toggle {% if current_size == 2 %}active{% endif %}">2</a>
+                            {% endif %}
+                            <a href="/?style={{current_style}}&size=3"
+                                class="btn-toggle {% if current_size == 3 %}active{% endif %}">3</a>
+                            <a href="/?style={{current_style}}&size=4"
+                                class="btn-toggle {% if current_size == 4 %}active{% endif %}">4</a>
+                            <a href="/?style={{current_style}}&size=5"
+                                class="btn-toggle {% if current_size == 5 %}active{% endif %}">5</a>
+                            <a href="/?style={{current_style}}&size=6"
+                                class="btn-toggle {% if current_size == 6 %}active{% endif %}">6</a>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+            </div>
+        </header>
+
+        <style>
+            .controls-area {
+                display: flex;
+                gap: 30px;
+                background: #15191C;
+                padding: 15px 20px;
+                border-radius: 8px;
+                border: 1px solid var(--border);
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .control-group {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            }
+
+            .lbl {
+                font-size: 0.7rem;
+                font-weight: 700;
+                color: var(--text-muted);
+                letter-spacing: 0.05em;
+            }
+
+            .btn-group {
+                display: flex;
+                gap: 5px;
+            }
+
+            .btn-toggle {
+                padding: 6px 14px;
+                border: 1px solid #333;
+                border-radius: 4px;
+                color: #888;
+                text-decoration: none;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 0.85rem;
+                transition: all 0.2s;
+                min-width: 30px;
+                text-align: center;
+            }
+
+            .btn-toggle:hover {
+                border-color: #666;
+                color: #ccc;
+                background: rgba(255, 255, 255, 0.05);
+            }
+
+            .btn-toggle.active {
+                background: rgba(0, 255, 128, 0.1);
+                border-color: #00FF80;
+                color: #00FF80;
+                box-shadow: 0 0 10px rgba(0, 255, 128, 0.2);
+                font-weight: 700;
+            }
+        </style>
+
+        <div class="parlay-grid">
+            {% if slips %}
+            {% for slip in slips %}
+            <div class="slip-card">
+                <div class="slip-header">
+                    <div class="slip-index">
+                        {% if slip.Is_Fallback %}
+                        TOP PROP #{{ loop.index }}
+                        {% else %}
+                        SLIP #{{ loop.index }}
+                        {% endif %}
+                    </div>
+                    <div class="slip-stats">
+                        <div class="stat-group">
+                            <span class="stat-lbl">
+                                {% if slip.Is_Fallback %}WIN %{% else %}AVG WIN %{% endif %}
+                            </span>
+                            <span class="stat-val val-good">{{ slip.Avg_Win_Pct }}%</span>
+                        </div>
+                        <div class="stat-group">
+                            <span class="stat-lbl">EDGE</span>
+                            <span class="stat-val branch-main prop-edge" data-winpct="{{ slip.Avg_Win_Pct }}">
+                                +{{ slip.Total_Edge }}%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="legs-container">
+                    {% for leg in slip.Legs %}
+                    <div class="leg-row">
+                        <div class="leg-avatar">
+                            {% if leg.Player_Image %}
+                            <img src="{{ leg.Player_Image }}"
+                                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                            <div class="leg-avatar-ph" style="display:none">{{ leg.Initials }}</div>
+                            {% else %}
+                            <div class="leg-avatar-ph">{{ leg.Initials }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="leg-info">
+                            <div class="leg-main">{{ leg.Player }}</div>
+                            <div class="leg-meta">
+                                {{ leg.Prop_Type }}
+                                <span
+                                    class="bet-selection {{ 'bet-over' if 'OVER' in leg.Bet_Direction else 'bet-under' }}">
+                                    {{ leg.Bet_Direction }} {{ leg.PrizePicks_Line }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="leg-prob">
+                            <span class="prob-pill">
+                                {{ leg.Fair_Win_Pct }}%
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                {% if current_style == 'props' %}
+                No profitable individual props found.<br>
+                Try updating the data.
+                {% else %}
+                No valid parlays found based on current criteria.<br>
+                Try updating the data or switching styles.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+
+
+        <script>
+            // Load default on start
+            window.onload = function () {
+                // Trigger props update if on props page
+                if (document.getElementById('propThreshold')) {
+                    updatePropEdges();
+                }
+            }
+
+            function updatePropEdges() {
+                const threshold = parseFloat(document.getElementById('propThreshold').value);
+                document.querySelectorAll('.prop-edge').forEach(el => {
+                    const winPct = parseFloat(el.dataset.winpct);
+                    const edge = (winPct - threshold).toFixed(2);
+                    const sign = edge >= 0 ? '+' : '';
+                    el.innerText = `${sign}${edge}%`;
+
+                    // Color update
+                    if (edge >= 0) el.style.color = '#00FF94'; // Green
+                    else el.style.color = '#FF4D4D'; // Red
+                });
+            }
+
+
+
+
+        </script>
+
+
+</body>
+
+</html>
