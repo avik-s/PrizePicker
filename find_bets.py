@@ -8,7 +8,7 @@ PrizePicks lines against FanDuel's "Fair" odds (vig-removed), and constructs opt
 Key Features:
 - Loads CSV props from the 'props/' directory.
 - Filters bets based on win probability thresholds.
-- Generates 2-man Power Plays and 3-6 man Flex plays.
+- Generates 2-6 man Power Plays and 3-6 man Flex plays.
 - Provides a web dashboard to view and analyze potential slips.
 """
 import pandas as pd
